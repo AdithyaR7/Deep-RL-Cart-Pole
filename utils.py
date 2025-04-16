@@ -1,4 +1,4 @@
-import numpy as np
+import os
 import gymnasium as gym
 from collections import deque
 import random
@@ -182,6 +182,7 @@ class CartPole_DQN():
         - epsilon_min: epsilon value to stop decay at
         - epsilon_decay: factor to decay epsilon by each ___
         """
+        self.episodes = episodes
         epsilon = epsilon_init
         episode_rewards = []    # Store episode rewards
         epsilon_hist = []       # Track epsilon values for plotting
@@ -228,7 +229,7 @@ class CartPole_DQN():
             plt.title('Epsilon Decay')
             plt.tight_layout()
             plt.savefig("cartpole_dqn_training.png")
-            
+        return
     
     def test(self, episodes=5):
         """Run the trained policy DQN in the env 'episodes' times. Creates renders"""
@@ -244,4 +245,23 @@ class CartPole_DQN():
                 self.env.render()   # Render the environment for visualization
         
         self.env.close()
+        return
+    
+    
+    def save_weights(self, weights_path):
+        """Save the model weights to weights_path after training"""
+        torch.save(self.policy_dqn.state_dict(), weights_path)
+        print(f"Trained model weights savef to {weights_path} after {self.episodes} episodes.")
+        return
+        
+    
+    def load_weights(self, weights_path):
+        """Load model weights from weights_path before testing"""
+        if os.path.exists(weights_path):                # Extra safety check           
+            model_weights = torch.load(weights_path, map_location=self.device)
+            self.policy_dqn.load_state_dict(model_weights)
+            # We do not need to load weights into the target netwrok for testing
+            print(f"Loaded model weights from {weights_path}!")
+        else:
+            print(f"Warning: no model weights found. at {weights_path}, running untrained.")
         return
