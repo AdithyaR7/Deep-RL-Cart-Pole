@@ -6,6 +6,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+import cv2
 
 # Deep Q Network Class (Neural Network)
 class DQN(nn.Module):
@@ -70,8 +71,8 @@ class MemoryReplay():
 
 # CarPole class to be solved using DQN
 class CartPole_DQN():
-    def __init__(self, env: gym.Env, hidden_size=128, lr=0.001, gamma=0.99, 
-                 batch_size=64, memory_size=1000, sync_rate=10):
+    def __init__(self, env: gym.Env, weights_path, hidden_size=128, lr=0.0001, gamma=0.97, 
+                 batch_size=64, memory_size=5000, sync_rate=10):
         """
         Initialize all parameters required to solve the problem
         
@@ -88,6 +89,9 @@ class CartPole_DQN():
         self.env = env  
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {self.device}")
+         
+        # Path to save model weights
+        self.weights_path = weights_path
         
         # Set up dimension of state and action space
         state_dim = self.env.observation_space.shape[0]
@@ -113,10 +117,8 @@ class CartPole_DQN():
         self.lr = lr                    # learning rate
         self.batch_size = batch_size    # batch of training data samplef from memory
         self.sync_rate = sync_rate      # Num steps of network before syncing policy -> target netwroks
-               
-        self.actions = ['L', 'R']       # For printing: 0 = push the cart Left, 1 = push the cart right. 
-        
-        
+
+
     def select_action(self, state, epsilon):
         """Selects appropriate action based on epsilon"""
         # Select epsilon greedy action
@@ -169,29 +171,62 @@ class CartPole_DQN():
         loss.backward()
         self.optimizer.step()
         return
-        
+    
+    
+    def evaluate_and_render(self, episode_idx):
+        """
+        Runs one evaluation episode with epsilon=0 and returns frames with overlays
+        Used to visualized how well the agent performs in the course of its training.
+        """
+        state, _ = self.env.reset()
+        done = False
+        total_reward = 0
+        step = 0
+        frames = []
+
+        while not done:
+            action = self.select_action(state, epsilon=0.0)  # Always greedy
+            state, reward, terminated, truncated, _ = self.env.step(action)
+            done = terminated or truncated
+            total_reward += reward
+            step += 1
+
+            frame = self.env.render()
+            overlay = f"Training Ep: {episode_idx}  Step: {step}  Reward: {int(total_reward)}"
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            cv2.putText(frame_bgr, overlay, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.8, (0, 0, 255), 2, cv2.LINE_AA)
+            frames.append(frame_bgr)
+
+        return frames
        
         
-    def train(self, episodes, epsilon_init=1.0, epsilon_min=0.01, epsilon_decay=0.995):
+    def train(self, episodes, epsilon_init=1.0, epsilon_min=0.05, epsilon_decay=0.9995, save_video=True ):
         """
         Train the DQN on the CartPole Environment
         
         Paramters:
-        - episodes: number of runs/epochs of the env to train the model
-        - epsilon_init: initial value of epsilon
-        - epsilon_min: epsilon value to stop decay at
-        - epsilon_decay: factor to decay epsilon by each ___
+        - episodes: total training episodes
+        - epsilon_init: initial epsilon for exploration
+        - epsilon_min: minimum epsilon
+        - epsilon_decay: decay factor per episode
+        - save_video: bool whether to save the video
+        - render_every: interval to render an episode for video
         """
         self.episodes = episodes
         epsilon = epsilon_init
         episode_rewards = []    # Store episode rewards
         epsilon_hist = []       # Track epsilon values for plotting
+        frames = []             # Record training progress to video
+        render_interval = 20    # Episode interval to render training progress
+        best_reward = float('-inf') 
+        self.best_model_state = None
         
         for episode in range(episodes):
             state, _ = self.env.reset()     # Reset the env at the start of each episode
             total_reward = 0
             done = False
-            
+                        
             while not done:
                 # Select 'epsilon-greedy' or 'best' action and step through the environment
                 action = self.select_action(state, epsilon)   
@@ -205,63 +240,122 @@ class CartPole_DQN():
                 
                 self.optimize_model()           # Update model weights based on episode
             
+            # Update rewards for the episode
             episode_rewards.append(total_reward)
+            
+            # Update best model weights if reward is higher
+            if total_reward > best_reward:
+                best_reward = total_reward
+                self.best_model_state = self.policy_dqn.state_dict() # Store copy of best weights so far
             
             # Decay epsilon. Explore less as we progress
             epsilon = max(epsilon_min, epsilon*epsilon_decay)   
             epsilon_hist.append(epsilon)
             
             # Sync policy network to target network
-            if episodes % self.sync_rate == 0:
+            if episode % self.sync_rate == 0:
                 self.target_dqn.load_state_dict(self.policy_dqn.state_dict())
                 
             # Print training progress
             if episode % 10 == 0:
                 print(f"Episode {episode}, Reward: {total_reward:.2f}, Epsilon: {epsilon:.3f}")
+            
+            # Update render_interval as episodes progress since differnece in progress slows down
+            if episodes > 100:
+                render_interval = 50
+            elif episodes > 300:
+                render_interval = 100
                 
-            # Plot reward and epsilon
-            plt.figure(figsize=(12,5))
-            plt.subplot(1,2,1)
-            plt.plot(episode_rewards)
-            plt.title('Rewards per Episode')
-            plt.subplot(1,2,2)
-            plt.plot(epsilon_hist)
-            plt.title('Epsilon Decay')
-            plt.tight_layout()
-            plt.savefig("cartpole_dqn_training.png")
+            # Run inference to see how well the agent can perform at this point in the training
+            if save_video and ((episode % render_interval) or (episode == episodes)) == 0:
+                eval_frames = self.evaluate_and_render(episode)
+                frames.extend(eval_frames)
+          
+        # Save video
+        if save_video and frames:
+            h, w = frames[0].shape[:2]
+            fps = 60
+            video_name = "cartpole_training_progress.avi"
+            out = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'XVID'), fps, (w, h))
+            for f in frames:
+                out.write(f)
+            out.release()
+            print(f"Eval video saved to {video_name}")
+          
+                
+        # Plot reward and epsilon
+        plt.figure(figsize=(12,5))
+        plt.subplot(1,2,1)
+        plt.plot(episode_rewards)
+        plt.title('Rewards per Episode')
+        plt.subplot(1,2,2)
+        plt.plot(epsilon_hist)
+        plt.title('Epsilon Decay')
+        plt.tight_layout()
+        plt.savefig("cartpole_dqn_training.png")
         return
     
-    def test(self, episodes=5):
+    def test(self, episodes=5, save_video=True):
         """Run the trained policy DQN in the env 'episodes' times. Creates renders"""
         
-        for _ in range(episodes):
+        # Save video
+        frames = []
+        
+        for ep in range(episodes):
             state, _ = self.env.reset()
-            done = False
+            done = False   
+            total_reward = 0
+            step = 0
+             
             while (not done):
                 # Network is fully trained, always seek best action
                 action = self.select_action(state, epsilon=0.0) 
-                state, _, terminated, truncated, _ = self.env.step(action)
+                state, reward, terminated, truncated, _ = self.env.step(action)
                 done = terminated or truncated
-                self.env.render()   # Render the environment for visualization
+                total_reward += reward
+                step += 1
+                
+                frame = self.env.render()   # Render the environment for visualization
         
+                # Add frame overlay text
+                if save_video:
+                    overlay_text = f"Episode: {ep+1}  Step: {step}  Reward: {int(total_reward)}"
+                    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    cv2.putText(frame_bgr, overlay_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
+                                1, (0, 0, 255), 2, cv2.LINE_AA)
+                    frames.append(frame_bgr)
+        
+        # Save video
+        if save_video and frames:
+            frame_size = (frames[0].shape[1], frames[0].shape[0])
+            video_name = "cartpole_test.avi"
+            out = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'XVID'), 30, frame_size)
+            for f in frames:
+                out.write(f)
+            out.release()
+            print(f"Video saved to {video_name}.")
+            
         self.env.close()
         return
     
     
-    def save_weights(self, weights_path):
+    def save_weights(self):
         """Save the model weights to weights_path after training"""
-        torch.save(self.policy_dqn.state_dict(), weights_path)
-        print(f"Trained model weights savef to {weights_path} after {self.episodes} episodes.")
+        if self.best_model_state is not None:
+            torch.save(self.best_model_state, self.weights_path)
+            print(f"Trained model weights saved to {self.weights_path} after {self.episodes} episodes.")
+        else:
+            print("Error during training: Best Weights is 'None'")
         return
         
     
-    def load_weights(self, weights_path):
+    def load_weights(self):
         """Load model weights from weights_path before testing"""
-        if os.path.exists(weights_path):                # Extra safety check           
-            model_weights = torch.load(weights_path, map_location=self.device)
+        if os.path.exists(self.weights_path):                # Extra safety check           
+            model_weights = torch.load(self.weights_path, map_location=self.device)
             self.policy_dqn.load_state_dict(model_weights)
             # We do not need to load weights into the target netwrok for testing
-            print(f"Loaded model weights from {weights_path}!")
+            print(f"Loaded model weights from {self.weights_path}!")
         else:
-            print(f"Warning: no model weights found. at {weights_path}, running untrained.")
+            print(f"Warning: no model weights found. at {self.weights_path}, running untrained.")
         return

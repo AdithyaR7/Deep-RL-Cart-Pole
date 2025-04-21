@@ -7,17 +7,17 @@ def main(mode, weights_path):
     
     if mode == 'train':
         # Train the environment and save the model weights
-        env = gym.make("CartPole-v1", render_mode=None)
-        agent = CartPole_DQN(env)
-        agent.train(500)
-        agent.save_weights(weights_path)
+        env = gym.make("CartPole-v1", render_mode="rgb_array")
+        agent = CartPole_DQN(env, weights_path)
+        agent.train(episodes=750)
+        agent.save_weights()
     
     elif mode == 'test':
         # Test the environment using saved model weights
-        env = gym.make("CartPole-v1", render_mode="human") # error
-        agent = CartPole_DQN(env)
-        agent.load_weights(weights_path)
-        agent.test(5)
+        env = gym.make("CartPole-v1", render_mode="rgb_array") # error
+        agent = CartPole_DQN(env, weights_path)
+        agent.load_weights()
+        agent.test(episodes=2, save_video=True)     # Save a video of the tests
     
     
 if __name__ == "__main__":
