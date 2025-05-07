@@ -24,6 +24,10 @@ class DQN(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(in_states, hidden),   # fully connected layer
             nn.ReLU(),                      # ReLu activation layer
+            nn.Linear(hidden, hidden),
+            nn.ReLU(),
+            # nn.Linear(hidden, hidden//2),
+            # nn.ReLU(),
             nn.Linear(hidden, num_actions)  # Output fc layer
         )
 
@@ -71,8 +75,8 @@ class MemoryReplay():
 
 # CarPole class to be solved using DQN
 class CartPole_DQN():
-    def __init__(self, env: gym.Env, weights_path, hidden_size=128, lr=0.0001, gamma=0.97, 
-                 batch_size=64, memory_size=5000, sync_rate=10):
+    def __init__(self, env: gym.Env, weights_path, hidden_size=128, lr=0.0005, gamma=0.99, 
+                 batch_size=256, memory_size=40000, sync_rate=10):
         """
         Initialize all parameters required to solve the problem
         
@@ -84,7 +88,7 @@ class CartPole_DQN():
         - batch_size:
         - memory_size:
         - sync_rate: 
-        """
+        """ 
 
         self.env = env  
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -158,9 +162,17 @@ class CartPole_DQN():
         q_vals = self.policy_dqn(states).gather(1, actions) # (64, 1). 
         # .gather() extracts the q_value taken at that action index. Avoids for loop!
         
-        # Compute max Q(s',a') for next_states, next_actions = best estimated q_val for next state
-        next_q_prediction = self.target_dqn(next_states)    # (batch_size, 2)
-        next_q_vals = next_q_prediction.max(1, keepdim=True)[0] # Extract maximum values (batch_size, 1)
+        # Use Double DQN to predict next_q_vals to help prevent overestimation bias. 
+        with torch.no_grad():
+            # Policy network selects best actions for next states
+            next_actions = self.policy_dqn(next_states).argmax(1, keepdim=True)
+            
+            # Target network evaluates those selected actions
+            next_q_vals = self.target_dqn(next_states).gather(1, next_actions)
+        
+        # # Compute max Q(s',a') for next_states, next_actions = best estimated q_val for next state
+        # next_q_prediction = self.target_dqn(next_states)    # (batch_size, 2)
+        # next_q_vals = next_q_prediction.max(1, keepdim=True)[0] # Extract maximum values (batch_size, 1)
         
         # Compute target q_vals using Bellman equation
         target_q_vals = rewards + self.gamma * next_q_vals * (1 - dones) # (batch_size, 1). Only calc where done=False
@@ -169,10 +181,44 @@ class CartPole_DQN():
         loss = self.loss_fn(q_vals, target_q_vals)
         self.optimizer.zero_grad()
         loss.backward()
+        # Add gradient clipping
+        torch.nn.utils.clip_grad_norm_(self.policy_dqn.parameters(), max_norm=1.0)
         self.optimizer.step()
         return
     
+    def warmup_replay_buffer(self, steps=5000):
+        """
+        Fill the replay buffer with random experiences before training starts.
+        This helps stabilize the early learning process.
+        
+        Parameters:
+        - steps: Number of random actions to collect
+        """
+        print(f"Warming up replay buffer with {steps} random experiences...")
+        state, _ = self.env.reset()
+        
+        for step in range(steps):
+            # Take random actions
+            action = self.env.action_space.sample()
+            next_state, reward, terminated, truncated, _ = self.env.step(action)
+            done = terminated or truncated
+            
+            # Store the experience
+            self.memory.push((state, action, next_state, reward, done))
+            
+            # Reset environment if episode ended, otherwise continue
+            if done:
+                state, _ = self.env.reset()
+            else:
+                state = next_state
+                
+            # Print progress
+            if (step + 1) % 1000 == 0:
+                print(f"Warmup progress: {step + 1}/{steps}")
+        
+        print("Replay buffer warmup complete!")
     
+
     def evaluate_and_render(self, episode_idx):
         """
         Runs one evaluation episode with epsilon=0 and returns frames with overlays
@@ -201,7 +247,7 @@ class CartPole_DQN():
         return frames
        
         
-    def train(self, episodes, epsilon_init=1.0, epsilon_min=0.05, epsilon_decay=0.9995, save_video=True ):
+    def train(self, episodes, epsilon_init=1.0, epsilon_min=0.02, epsilon_decay=0.995, save_video=True ):
         """
         Train the DQN on the CartPole Environment
         
@@ -213,6 +259,9 @@ class CartPole_DQN():
         - save_video: bool whether to save the video
         - render_every: interval to render an episode for video
         """
+        # Warm up the replay buffer before starting training
+        self.warmup_replay_buffer(steps=10000)
+        
         self.episodes = episodes
         epsilon = epsilon_init
         episode_rewards = []    # Store episode rewards
@@ -244,7 +293,7 @@ class CartPole_DQN():
             episode_rewards.append(total_reward)
             
             # Update best model weights if reward is higher
-            if total_reward > best_reward:
+            if total_reward >= best_reward:
                 best_reward = total_reward
                 self.best_model_state = self.policy_dqn.state_dict() # Store copy of best weights so far
             
@@ -253,7 +302,7 @@ class CartPole_DQN():
             epsilon_hist.append(epsilon)
             
             # Sync policy network to target network
-            if episode % self.sync_rate == 0:
+            if (episode + 1) % self.sync_rate == 0:
                 self.target_dqn.load_state_dict(self.policy_dqn.state_dict())
                 
             # Print training progress
@@ -263,11 +312,11 @@ class CartPole_DQN():
             # Update render_interval as episodes progress since differnece in progress slows down
             if episodes > 100:
                 render_interval = 50
-            elif episodes > 300:
+            if episodes > 300:
                 render_interval = 100
                 
             # Run inference to see how well the agent can perform at this point in the training
-            if save_video and ((episode % render_interval) or (episode == episodes)) == 0:
+            if save_video and ((episode % render_interval == 0) or (episode == (episodes-1))):
                 eval_frames = self.evaluate_and_render(episode)
                 frames.extend(eval_frames)
           
@@ -281,7 +330,9 @@ class CartPole_DQN():
                 out.write(f)
             out.release()
             print(f"Eval video saved to {video_name}")
-          
+        
+        # Save best weights
+        self.save_weights()
                 
         # Plot reward and epsilon
         plt.figure(figsize=(12,5))
