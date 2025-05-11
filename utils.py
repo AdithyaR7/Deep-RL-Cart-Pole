@@ -7,6 +7,7 @@ from torch import nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import cv2
+import numpy as np
 
 # Deep Q Network Class (Neural Network)
 class DQN(nn.Module):
@@ -296,6 +297,7 @@ class CartPole_DQN():
             if total_reward >= best_reward:
                 best_reward = total_reward
                 self.best_model_state = self.policy_dqn.state_dict() # Store copy of best weights so far
+                self.save_weights(episode) # Save best weights = model checkpoints
             
             # Decay epsilon. Explore less as we progress
             epsilon = max(epsilon_min, epsilon*epsilon_decay)   
@@ -310,15 +312,22 @@ class CartPole_DQN():
                 print(f"Episode {episode}, Reward: {total_reward:.2f}, Epsilon: {epsilon:.3f}")
             
             # Update render_interval as episodes progress since differnece in progress slows down
-            if episodes > 100:
+            if episode > 100:
                 render_interval = 50
-            if episodes > 300:
+            if episode > 300:
                 render_interval = 100
                 
             # Run inference to see how well the agent can perform at this point in the training
             if save_video and ((episode % render_interval == 0) or (episode == (episodes-1))):
                 eval_frames = self.evaluate_and_render(episode)
                 frames.extend(eval_frames)
+          
+            # Early stopping if average reward is high for the last N episodes
+            if episode > 400:  # wait until there's enough data
+                avg_reward = np.mean(episode_rewards[-50:])
+                if avg_reward >= 490:
+                    print(f"Early stopping at episode {episode} with avg reward {avg_reward:.2f}")
+                    break
           
         # Save video
         if save_video and frames:
@@ -331,8 +340,6 @@ class CartPole_DQN():
             out.release()
             print(f"Eval video saved to {video_name}")
         
-        # Save best weights
-        self.save_weights()
                 
         # Plot reward and epsilon
         plt.figure(figsize=(12,5))
@@ -390,11 +397,12 @@ class CartPole_DQN():
         return
     
     
-    def save_weights(self):
+    def save_weights(self, episode):
         """Save the model weights to weights_path after training"""
         if self.best_model_state is not None:
             torch.save(self.best_model_state, self.weights_path)
-            print(f"Trained model weights saved to {self.weights_path} after {self.episodes} episodes.")
+            if (episode > 500) and (episode % 10 == 0):
+                print(f"Model weights saved to {self.weights_path} after {episode} episodes.")
         else:
             print("Error during training: Best Weights is 'None'")
         return
