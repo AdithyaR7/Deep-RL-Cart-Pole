@@ -324,7 +324,7 @@ class CartPole_DQN():
           
             # Early stopping if average reward is high for the last N episodes
             if episode > 400:  # wait until there's enough data
-                avg_reward = np.mean(episode_rewards[-50:])
+                avg_reward = np.mean(episode_rewards[-30:])
                 if avg_reward >= 490:
                     print(f"Early stopping at episode {episode} with avg reward {avg_reward:.2f}")
                     break

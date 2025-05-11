@@ -13,10 +13,10 @@ def main(mode, weights_path):
     
     elif mode == 'test':
         # Test the environment using saved model weights
-        env = gym.make("CartPole-v1", render_mode="rgb_array") # error
+        env = gym.make("CartPole-v1", render_mode="rgb_array") 
         agent = CartPole_DQN(env, weights_path)
         agent.load_weights()
-        agent.test(episodes=5, save_video=True)     # Save a video of the tests
+        agent.test(episodes=3, save_video=True)
     
     
 if __name__ == "__main__":
