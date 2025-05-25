@@ -326,9 +326,9 @@ class CartPole_DQN():
         # Save video
         if save_video and frames:
             h, w = frames[0].shape[:2]
-            fps = 60
-            video_name = "cartpole_training_progress.avi"
-            out = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'XVID'), fps, (w, h))
+            fps = 30
+            video_name = "cartpole_training_progress.mp4"
+            out = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
             for f in frames:
                 out.write(f)
             out.release()
@@ -381,8 +381,8 @@ class CartPole_DQN():
         # Save video
         if save_video and frames:
             frame_size = (frames[0].shape[1], frames[0].shape[0])
-            video_name = "cartpole_test.avi"
-            out = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'XVID'), 30, frame_size)
+            video_name = "cartpole_test.mp4"
+            out = cv2.VideoWriter(video_name, cv2.VideoWriter_fourcc(*'mp4v'), 30, frame_size)
             for f in frames:
                 out.write(f)
             out.release()
