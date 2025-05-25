@@ -27,8 +27,6 @@ class DQN(nn.Module):
             nn.ReLU(),                      # ReLu activation layer
             nn.Linear(hidden, hidden),
             nn.ReLU(),
-            # nn.Linear(hidden, hidden//2),
-            # nn.ReLU(),
             nn.Linear(hidden, num_actions)  # Output fc layer
         )
 
@@ -55,14 +53,14 @@ class MemoryReplay():
     def push(self, step_results):
         """
         Add the transittion to memory
-        - transition: tuple of the results of a single step of the agent in the env
+        - step_results: tuple of the results of a single step of the agent in the env
         """
         self.memory.append(step_results)
 
     def sample(self, sample_size):
         """
         Randomly samples the memory for ...
-        - sample_size: 
+        - sample_size: numner of elements to be sampled from memory for training
         """
         return random.sample(self.memory, sample_size)
     
@@ -82,13 +80,14 @@ class CartPole_DQN():
         Initialize all parameters required to solve the problem
         
         Parameters:
-        - env:
-        - hidden_size:
-        - lr:
-        - gamma:
-        - batch_size:
-        - memory_size:
-        - sync_rate: 
+        - env:          OpenAI Gymnasium environment (CartPole-v1)
+        - weights_path: File path to save/load trained model weights
+        - hidden_size:  Number of neurons in the hidden layers of the neural network 
+        - lr:           Learning rate for the Adam optimizer
+        - gamma:        Discount factor for future rewards in Bellman equation
+        - batch_size:   Number of experiences sampled from replay buffer for training
+        - memory_size:  Maximum size of the experience replay buffer
+        - sync_rate:    Number of training steps before copying policy network weights to target network
         """ 
 
         self.env = env  
@@ -108,7 +107,7 @@ class CartPole_DQN():
         
         # Copy weights & biases from policy to target network to make identical
         self.target_dqn.load_state_dict(self.policy_dqn.state_dict())
-        self.target_dqn.eval()  # Sets to eval mode - inference only, no need for torch.no_grad() 
+        self.target_dqn.eval()  # Sets to eval mode - inference only
         
         # Initialize Adam optimizer and Mean Squared Error loss function
         self.optimizer = torch.optim.Adam(self.policy_dqn.parameters(), lr=lr)
@@ -170,11 +169,7 @@ class CartPole_DQN():
             
             # Target network evaluates those selected actions
             next_q_vals = self.target_dqn(next_states).gather(1, next_actions)
-        
-        # # Compute max Q(s',a') for next_states, next_actions = best estimated q_val for next state
-        # next_q_prediction = self.target_dqn(next_states)    # (batch_size, 2)
-        # next_q_vals = next_q_prediction.max(1, keepdim=True)[0] # Extract maximum values (batch_size, 1)
-        
+               
         # Compute target q_vals using Bellman equation
         target_q_vals = rewards + self.gamma * next_q_vals * (1 - dones) # (batch_size, 1). Only calc where done=False
         
@@ -182,8 +177,7 @@ class CartPole_DQN():
         loss = self.loss_fn(q_vals, target_q_vals)
         self.optimizer.zero_grad()
         loss.backward()
-        # Add gradient clipping
-        torch.nn.utils.clip_grad_norm_(self.policy_dqn.parameters(), max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_(self.policy_dqn.parameters(), max_norm=1.0)      # Gradient clipping
         self.optimizer.step()
         return
     
@@ -253,22 +247,22 @@ class CartPole_DQN():
         Train the DQN on the CartPole Environment
         
         Paramters:
-        - episodes: total training episodes
-        - epsilon_init: initial epsilon for exploration
-        - epsilon_min: minimum epsilon
+        - episodes:      total training episodes
+        - epsilon_init:  initial epsilon for exploration
+        - epsilon_min:   minimum epsilon
         - epsilon_decay: decay factor per episode
-        - save_video: bool whether to save the video
-        - render_every: interval to render an episode for video
+        - save_video:    bool whether to save the video
+        - render_every:  interval to render an episode for video
         """
         # Warm up the replay buffer before starting training
         self.warmup_replay_buffer(steps=10000)
         
         self.episodes = episodes
         epsilon = epsilon_init
-        episode_rewards = []    # Store episode rewards
-        epsilon_hist = []       # Track epsilon values for plotting
-        frames = []             # Record training progress to video
-        render_interval = 20    # Episode interval to render training progress
+        episode_rewards = []                # Store episode rewards
+        epsilon_hist = []                   # Track epsilon values for plotting
+        frames = []                         # Record training progress to video
+        render_interval = 20                # Episode interval to render training progress
         best_reward = float('-inf') 
         self.best_model_state = None
         
@@ -297,7 +291,7 @@ class CartPole_DQN():
             if total_reward >= best_reward:
                 best_reward = total_reward
                 self.best_model_state = self.policy_dqn.state_dict() # Store copy of best weights so far
-                self.save_weights(episode) # Save best weights = model checkpoints
+                self.save_weights(episode)                           # Save best weights = model checkpoints
             
             # Decay epsilon. Explore less as we progress
             epsilon = max(epsilon_min, epsilon*epsilon_decay)   
@@ -341,7 +335,7 @@ class CartPole_DQN():
             print(f"Eval video saved to {video_name}")
         
                 
-        # Plot reward and epsilon
+        # Plot reward and epsilon and save figs
         plt.figure(figsize=(12,5))
         plt.subplot(1,2,1)
         plt.plot(episode_rewards)
@@ -352,6 +346,7 @@ class CartPole_DQN():
         plt.tight_layout()
         plt.savefig("cartpole_dqn_training.png")
         return
+    
     
     def test(self, episodes=5, save_video=True):
         """Run the trained policy DQN in the env 'episodes' times. Creates renders"""
