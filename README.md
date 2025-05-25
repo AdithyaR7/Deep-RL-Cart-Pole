@@ -24,7 +24,9 @@ Instead of using a traditional Q-table (infeasible with continuous state spaces)
 
 The agent during the training process, learning as it progresses:
 
-<img src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/cartpole_training_progress.avi" width="600" />
+<video width="640" height="360" controls>
+  <source src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/cartpole_training_progress.mp4" type="video/mp4">
+</video>
 
 ### DQN Highlights:
 - **Input:** 4D state (cart & pole variables)
