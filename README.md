@@ -22,11 +22,9 @@ Instead of using a traditional Q-table (infeasible with continuous state spaces)
 - The agent learns to predict Q-values for each action given a state and chooses actions using an **epsilon-greedy** policy.
 - A **Replay Buffer** stores past experiences and samples mini-batches to break temporal correlation.
 
-The agent during the training process, learning as it progresses (click to play):
+The agent during the training process, learning as it progresses:
 
-<a href="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/cartpole_training_progress.mp4" target="_blank">
-  <img src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/images/train_video_thumbnail.png" alt="Watch the demo" width="500"/>
-</a>
+<img src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/agent_gifs/cartpole_training_progress.gif" width="600" />
 
 ### DQN Highlights:
 - **Input:** 4D state (cart & pole variables)
@@ -38,8 +36,7 @@ The agent during the training process, learning as it progresses (click to play)
 
 A common problem encountered with this is that a standard DQN can overestimate action values during the training process. The fix is using the 'double DQN' method that reduces this by decoupling the action selection and evaluation between the two networks, leading to more stable and reliable learning.
 
-The fully trained agent solving a randomly initialized environment (click to play):
+The fully trained agent solving a randomly initialized environment:
 
-<a href="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/cartpole_test.mp4" target="_blank">
-  <img src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/images/test_video_thumbnail.png" alt="Watch the demo" width="500"/>
-</a>
+<img src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/agent_gifs/cartpole_test.gif" width="600" />
+
