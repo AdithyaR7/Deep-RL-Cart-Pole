@@ -26,13 +26,6 @@ The agent during the training process, learning as it progresses:
 
 <img src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/agent_gifs/cartpole_training_progress.gif" width="600" />
 
-### DQN Highlights:
-- **Input:** 4D state (cart & pole variables)
-- **Output:** Q-values for each possible action (left, right)
-- **Network:** 1 hidden layer with ReLU, trained using MSE loss
-- **Exploration:** Epsilon-greedy strategy
-- **Replay Buffer:** Stores past experiences for stable training
-- **Target Network:** (Optional) Used to improve stability
 
 A common problem encountered with this is that a standard DQN can overestimate action values during the training process. The fix is using the 'double DQN' method that reduces this by decoupling the action selection and evaluation between the two networks, leading to more stable and reliable learning.
 
