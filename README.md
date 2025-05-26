@@ -26,12 +26,40 @@ The agent during the training process, learning as it progresses:
 
 <img src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/agent_gifs/cartpole_training_progress.gif" width="600" />
 
-
 A common problem encountered with this is that a standard DQN can overestimate action values during the training process. The fix is using the 'double DQN' method that reduces this by decoupling the action selection and evaluation between the two networks, leading to more stable and reliable learning.
 
 The fully trained agent solving a randomly initialized environment:
 
 <img src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/agent_gifs/cartpole_test.gif" width="600" />
+
+# Further Improvements: Stability and Centering
+
+We can go a step further with the goal of having the agent solving the problem while as still as possible in the center of the screen. To do this, a custom reward function was made to accomodate extra penalties for movement in angle and deviation from the center. 
+
+The following code was added to the training loop, and the agent then re-trained:
+
+```bash
+########### Improvement to base functionality. Comment this out to achieve first part of ReadMe
+# Custom reward to favor centered position and upright pole
+x, x_dot, theta, theta_dot = next_state
+reward = 1.0
+reward -= 2.0 * (abs(x) / 2.4)          # strongly penalize distance from center
+reward -= 1.5 * (abs(theta) / 0.2095)   # strongly penalize pole angle
+reward -= 0.1 * abs(x_dot)              # penalize movement
+reward -= 0.1 * abs(theta_dot)          # penalize swinging
+                
+reward = max(reward, -1.0)  # prevent overly negative reward
+                
+if terminated:
+    reward -= 2.0                       # extra penalty if episode ends early
+############
+```
+
+This resulting test video below shows the agent solving this in a much more stable manner with minimal deviations.
+
+<img src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/agent_gifs/cartpole_test_stable.gif" width="600" />
+
+Not: the video was rendered and then added to the dir. Manually change video_path to prevent over-writing the previous attempts/videos.
 
 # Installation
 
