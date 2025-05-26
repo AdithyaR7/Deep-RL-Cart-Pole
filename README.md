@@ -40,3 +40,33 @@ The fully trained agent solving a randomly initialized environment:
 
 <img src="https://github.com/AdithyaR7/Deep-RL-Cart-Pole/blob/main/agent_gifs/cartpole_test.gif" width="600" />
 
+# Installation
+
+This program was made using Python 3.10.16 in a Conda environment:
+```bash
+conda create --name RL_Taxi python=3.10
+```
+
+Requires PyTorch with CUDA. To check if you've installed it correctly, printing this should return True:
+```bash
+torch.cuda.is_available()
+```
+
+Use pip and requirements.txt to install the required packages:
+```bash
+pip install -r requirements.txt
+```
+
+# Running the Code
+
+Run the python code to train the model:
+```bash
+python3 cartpole.py --mode train
+```
+
+Then, run this to test the model:
+```bash
+python3 cartpole.py --mode test
+```
+
+This saves the training and test results as videos, along with the training curve for rewards over time. 
