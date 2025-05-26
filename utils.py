@@ -275,6 +275,24 @@ class CartPole_DQN():
                 # Select 'epsilon-greedy' or 'best' action and step through the environment
                 action = self.select_action(state, epsilon)   
                 next_state, reward, terminated, truncated, _ = self.env.step(action)
+                
+                ########### Improvement to base functionality. Comment this out to achieve first part of ReadMe
+                # Custom reward to favor centered position and upright pole
+                x, x_dot, theta, theta_dot = next_state
+                reward = 1.0
+                reward -= 2.0 * (abs(x) / 2.4)          # strongly penalize distance from center
+                reward -= 1.5 * (abs(theta) / 0.2095)   # strongly penalize pole angle
+                reward -= 0.1 * abs(x_dot)              # penalize movement
+                reward -= 0.1 * abs(theta_dot)          # penalize swinging
+                
+                reward = max(reward, -1.0)  # prevent overly negative reward
+                
+                if terminated:
+                    reward -= 2.0               # extra penalty if episode ends early
+                ############
+                
+                done = terminated or truncated  # True if episode ended
+                
                 done = terminated or truncated  # True if episode ended
                 
                 # Save results to memory
